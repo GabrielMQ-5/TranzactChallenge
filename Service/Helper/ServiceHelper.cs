@@ -8,9 +8,13 @@ namespace Service.Helper
 {
     public class ServiceHelper
     {
+        public const int MAX_FILES = 1;
+        private const int MAX_RETRIES = 5;
+        private const int MAX_FILE_RETRIES = 5;
         private const String PAGEVIEW_NAME_TEMPLATE = "pageviews-{0}{1}{2}-{3}0000.gz";
         private const String PAGEVIEW_URL_TEMPLATE = "{0}/{0}-{1}/";
         private static List<DateTime> lastFiles = new();
+        private static bool printDownloadHeader = true;
         static public List<string> GetFilenames()
         {
             List<string> filenames = new List<string>();
@@ -37,7 +41,8 @@ namespace Service.Helper
             timestamp = new DateTime(timestamp.Year, timestamp.Month, timestamp.Day, timestamp.Hour, 0, 0);
             int totalRetries = 0;
             int fileRetries = 0;
-            while (lastFiles.Count < 5 && totalRetries < 5)
+            WriteHeader();
+            while (lastFiles.Count < MAX_FILES && totalRetries < MAX_RETRIES)
             {
                 string filename = FormatFileName(timestamp);
                 UriBuilder uriBuilder = new UriBuilder(String.Concat(ApiUrl.BaseUrl, FormatFileUrl(timestamp), filename));
@@ -51,7 +56,7 @@ namespace Service.Helper
                         timestamp = timestamp.AddHours(-1);
                         fileRetries = 0;
                         ReportFoundFiles();
-                        DelayRequest(true);                        
+                        DelayRequest(true);
                     }
                 }
                 catch (WebException ex)
@@ -74,7 +79,7 @@ namespace Service.Helper
                             Console.WriteLine(@"Error: {0}", ex.Message);
                             Console.WriteLine(@"Retrying: ");
                         }
-                        if (fileRetries < 5)
+                        if (fileRetries < MAX_FILE_RETRIES)
                         {
                             fileRetries++;
                             Console.Write(@"Attempt {0}", fileRetries);
@@ -134,10 +139,28 @@ namespace Service.Helper
 
         static private void ReportFoundFiles()
         {
-            Console.Clear();
+            WriteHeader();
             for (int i = 0; i < lastFiles.Count; i++)
             {
                 Console.WriteLine(@"Dump {0} - File name: {1}", i + 1, FormatFileName(lastFiles[i]));
+            }
+        }
+
+        static private void WriteHeader()
+        {
+            Console.Clear();
+            Console.WriteLine(@"{0}{1}", new string(' ', 5), "WIKIMEDIA COUNT TOOL");
+            Console.WriteLine(new string('=', 30));
+        }
+
+        static public void WriteDownloadHeader()
+        {
+            if (printDownloadHeader)
+            {
+                Console.WriteLine(new string('=', 30));
+                Console.WriteLine(@"{0}{1}", new string(' ', 5), "DOWNLOADING FILES");
+                Console.WriteLine(new string('=', 30));
+                printDownloadHeader = false;
             }
         }
     }

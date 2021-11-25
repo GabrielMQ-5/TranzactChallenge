@@ -4,12 +4,14 @@ using System.IO;
 using System.Net;
 using System.Threading;
 using Core.Constants;
+using Service.Helper;
 
 namespace Service
 {
     public class WikimediaService
     {
         private bool _result = false;
+        private ProgressBar progressBar;
         private readonly SemaphoreSlim _semaphore = new SemaphoreSlim(0);
         private readonly string documentsPath;
         private readonly string applicationPath;
@@ -24,11 +26,12 @@ namespace Service
             unzippedPath = Path.Combine(applicationPath, Constants.UNZIPPED_FOLDER);
         }
 
-        public bool StartDownload(DownloadProgressChangedEventHandler updateDelegate, string fileUrl, string fileName, int timeout = 1 * 60 * 1000)
+        public bool StartDownload(string fileUrl, string fileName, int timeout = 5 * 60 * 1000)
         {
             try
             {
-                Container container = new();
+                ServiceHelper.WriteDownloadHeader();
+                progressBar = new ProgressBar(fileName);
                 string filePath = Path.Combine(dumpsPath, fileName);
                 if (!File.Exists(filePath))
                 {
@@ -37,10 +40,9 @@ namespace Service
                 using (WebClient client = new WebClient())
                 {
                     var url = new Uri(String.Concat(ApiUrl.BaseUrl, fileUrl, fileName));
-                    client.Headers["filename"] = fileName;
-                    client.DownloadProgressChanged += updateDelegate;
+                    client.DownloadProgressChanged += WebClientDownloadProgress;
                     client.DownloadFileCompleted += WebClientDownloadCompleted;
-                    Console.WriteLine(@"Downloading file: {0}", fileName);
+                    // Console.WriteLine(@"Downloading file: {0}", fileName);
                     client.DownloadFileAsync(url, dumpsPath + '\\' + fileName);
                     _semaphore.Wait(timeout);
                     return _result && File.Exists(dumpsPath + '\\' + fileName);
@@ -77,6 +79,12 @@ namespace Service
             {
                 Console.Write(e.Message);
             }
+        }
+
+        private void WebClientDownloadProgress(object sender, DownloadProgressChangedEventArgs args)
+        {
+            var (bytesReceived, totalBytesToReceive) = (Convert.ToDouble(args.BytesReceived), Convert.ToDouble(args.TotalBytesToReceive));
+            progressBar.Report(Math.Round(bytesReceived / totalBytesToReceive, 2));
         }
     }
 }
