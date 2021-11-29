@@ -3,19 +3,21 @@ using System.Collections.Generic;
 using System.Net;
 using System.Threading;
 using Core.Constants;
+using Core.Entities;
 
 namespace Service.Helper
 {
     public class ServiceHelper
     {
-        public const int MAX_FILES = 1;
-        private const int MAX_RETRIES = 5;
-        private const int MAX_FILE_RETRIES = 5;
         private const String PAGEVIEW_NAME_TEMPLATE = "pageviews-{0}{1}{2}-{3}0000.gz";
         private const String PAGEVIEW_URL_TEMPLATE = "{0}/{0}-{1}/";
-        private static List<DateTime> lastFiles = new();
-        private static bool printDownloadHeader = true;
-        static public List<string> GetFilenames()
+        private const int RESET_SCREEN_DELAY = 20;
+        private static String CONSOLE_MESSAGE = "";
+        private static bool requestsDelayed = false;
+        private static int clearScreen = RESET_SCREEN_DELAY;
+        public enum HeaderType : ushort { downloadHeader = 0, resultHeader = 1 };
+
+        static public List<string> GetFilenames(List<DateTime> lastFiles)
         {
             List<string> filenames = new List<string>();
             for (int index = 0; index < lastFiles.Count; index++)
@@ -25,7 +27,7 @@ namespace Service.Helper
             return filenames;
         }
 
-        static public List<string> GetUrls()
+        static public List<string> GetUrls(List<DateTime> lastFiles)
         {
             List<string> urls = new List<string>();
             for (int index = 0; index < lastFiles.Count; index++)
@@ -35,77 +37,13 @@ namespace Service.Helper
             return urls;
         }
 
-        public static void FindLastFiles()
-        {
-            DateTime timestamp = DateTime.UtcNow;
-            timestamp = new DateTime(timestamp.Year, timestamp.Month, timestamp.Day, timestamp.Hour, 0, 0);
-            int totalRetries = 0;
-            int fileRetries = 0;
-            WriteHeader();
-            while (lastFiles.Count < MAX_FILES && totalRetries < MAX_RETRIES)
-            {
-                string filename = FormatFileName(timestamp);
-                UriBuilder uriBuilder = new UriBuilder(String.Concat(ApiUrl.BaseUrl, FormatFileUrl(timestamp), filename));
-                HttpWebRequest request = (HttpWebRequest)HttpWebRequest.Create(uriBuilder.Uri);
-                try
-                {
-                    HttpWebResponse response = (HttpWebResponse)request.GetResponse();
-                    if (response.StatusCode == HttpStatusCode.OK)
-                    {
-                        lastFiles.Add(timestamp);
-                        timestamp = timestamp.AddHours(-1);
-                        fileRetries = 0;
-                        ReportFoundFiles();
-                        DelayRequest(true);
-                    }
-                }
-                catch (WebException ex)
-                {
-                    HttpWebResponse response = (HttpWebResponse)ex.Response;
-                    if (response.StatusCode == HttpStatusCode.NotFound)
-                    {
-                        timestamp = timestamp.AddHours(-1);
-                        fileRetries = 0;
-                        totalRetries++;
-                        Console.WriteLine(@"File was unavilable, skipping file: {0}", filename);
-                        Console.WriteLine(@"Error: {0}", ex.Message);
-                        DelayRequest(true);
-                    }
-                    else if (response.StatusCode == HttpStatusCode.ServiceUnavailable)
-                    {
-                        if (fileRetries == 0)
-                        {
-                            Console.WriteLine(@"Service was unavilable, slowing requests for file: {0}", filename);
-                            Console.WriteLine(@"Error: {0}", ex.Message);
-                            Console.WriteLine(@"Retrying: ");
-                        }
-                        if (fileRetries < MAX_FILE_RETRIES)
-                        {
-                            fileRetries++;
-                            Console.Write(@"Attempt {0}", fileRetries);
-                            DelayRequest(false, true, fileRetries);
-                            Console.Write(@" | ");
-                        }
-                        else
-                        {
-                            timestamp = timestamp.AddHours(-1);
-                            fileRetries = 0;
-                            totalRetries++;
-                            Console.WriteLine();
-                            DelayRequest(true);
-                        }
-                    }
-                }
-            }
-        }
-
-        static private DateTime GetCurrentTime()
+        static public DateTime GetCurrentTime()
         {
             DateTime timestamp = DateTime.UtcNow.AddHours(-1);
             return new DateTime(timestamp.Year, timestamp.Month, timestamp.Day, timestamp.Hour, 0, 0);
         }
 
-        static private string FormatFileName(DateTime timestamp)
+        static public string FormatFileName(DateTime timestamp)
         {
             string hourStr = '0' + timestamp.Hour.ToString();
             return String.Format(
@@ -117,7 +55,7 @@ namespace Service.Helper
                 );
         }
 
-        static private string FormatFileUrl(DateTime timestamp)
+        static public string FormatFileUrl(DateTime timestamp)
         {
             return String.Format(
                     PAGEVIEW_URL_TEMPLATE,
@@ -126,41 +64,142 @@ namespace Service.Helper
                     );
         }
 
-        static private void DelayRequest(bool includeMessage, bool includeDots = false, int delayMultiplier = 1)
+        static public void DelayRequest(int delayOffset = 0)
         {
-            if (includeMessage) Console.Write("Delaying requests to avoid service overload");
+            requestsDelayed = true;
+            CONSOLE_MESSAGE = "Delaying requests to avoid service overload";
             for (int i = 0; i < 5; i++)
             {
-                if (includeMessage || includeDots) Console.Write(".");
-                Thread.Sleep(2000 * delayMultiplier);
+                CONSOLE_MESSAGE += ".";
+                Thread.Sleep(3750 * (1 + delayOffset));
             }
-            if (includeMessage) Console.WriteLine();
+            CONSOLE_MESSAGE = "";
+            requestsDelayed = false;
         }
 
-        static private void ReportFoundFiles()
+        static public void ResetScreen()
         {
-            WriteHeader();
+            clearScreen = 0;
+            Console.Clear();
+        }
+
+        static public void WriteMainHeader()
+        {
+            string header = "WIKIMEDIA COUNT TOOL";
+            int offset = Console.WindowWidth / 2 - header.Length / 2;
+            Console.SetCursorPosition(0, 0);
+            Console.Write(new string('=', Console.WindowWidth));
+            Console.Write(@"{0}{1}{2}",
+                new string(' ', offset),
+                header,
+                new string(' ', Console.WindowWidth - (offset + header.Length)));
+            Console.Write(new string('=', Console.WindowWidth));
+        }
+
+        static public void ReportFoundFiles(List<DateTime> lastFiles, List<ProgressBar> progressBars, List<FileDownloadResult> fileResults, bool resetScreen = false)
+        {
+            if (clearScreen == 0 || resetScreen) { Console.Clear(); clearScreen = RESET_SCREEN_DELAY; }
+            else clearScreen--;
+            WriteMainHeader();
             for (int i = 0; i < lastFiles.Count; i++)
             {
                 Console.WriteLine(@"Dump {0} - File name: {1}", i + 1, FormatFileName(lastFiles[i]));
             }
+            if (progressBars.Count > 0) WriteReportHeader(HeaderType.downloadHeader);
+            for (int i = 0; i < lastFiles.Count; i++)
+            {
+                Console.WriteLine(progressBars[i].currentText);
+            }
+            if (fileResults.Count > 0) WriteReportHeader(HeaderType.resultHeader);
+            for (int i = 0; i < fileResults.Count; i++)
+            {
+                string resultString = String.Format(@"File {0} - {1}", fileResults[i].fileName, fileResults[i].result);
+                if (fileResults[i].error != null) resultString += String.Format(@": {0}{1}", fileResults[i].error,
+                    fileResults[i].retries > 0 ? String.Format(@" | Retries: {0}", fileResults[i].retries) : "");
+                Console.WriteLine(resultString);
+            }
+            if (requestsDelayed) Console.WriteLine(CONSOLE_MESSAGE);
         }
 
-        static private void WriteHeader()
+        static public void WriteReportHeader(HeaderType downloadHeaderType)
+        {
+            string header = downloadHeaderType == HeaderType.resultHeader ? "FILE DOWNLOAD RESULTS" :
+                downloadHeaderType == HeaderType.downloadHeader ? "DOWNLOAD PROGRESS" :
+                "";
+            int offset = Console.WindowWidth / 2 - header.Length / 2;
+            if (downloadHeaderType == HeaderType.downloadHeader) Console.SetCursorPosition(0, 3 + Constants.MAX_FILES);
+            else Console.SetCursorPosition(0, 6 + Constants.MAX_FILES * 2);
+            Console.Write(new string('=', Console.WindowWidth));
+            Console.Write(@"{0}{1}{2}",
+                new string(' ', offset),
+                header,
+                new string(' ', Console.WindowWidth - (offset + header.Length)));
+            Console.Write(new string('=', Console.WindowWidth));
+        }
+
+        static public void ReportDecompressedFiles(List<DownloadedFile> downloadedFiles)
+        {
+            if (clearScreen == 0) { Console.Clear(); clearScreen = RESET_SCREEN_DELAY; }
+            else clearScreen--;
+            List<string> decompressedFiles = new();
+            WriteMainHeader();
+            for (int i = 0; i < downloadedFiles.Count; i++)
+            {
+                string dFile = String.Format(@"Dump {0} - File name: {1} | {2}%", i + 1, downloadedFiles[i].fileName, downloadedFiles[i].percentage);
+                Console.WriteLine(@"{0}{1}", dFile, new string(' ', Console.WindowWidth - (dFile.Length)));
+                if (downloadedFiles[i].decompressedFileName != null) decompressedFiles.Add(downloadedFiles[i].decompressedFileName);
+            }
+            if (decompressedFiles.Count > 0) WriteDecompressHeader();
+            for (int i = 0; i < decompressedFiles.Count; i++)
+            {
+                Console.WriteLine(@"Unzipped file: {0}", decompressedFiles[i]);
+            }
+        }
+
+        static public void WriteDecompressHeader()
+        {
+            string header = "FILES DECOMPRESSED";
+            int offset = Console.WindowWidth / 2 - header.Length / 2;
+            Console.SetCursorPosition(0, 3 + Constants.MAX_FILES);
+            Console.Write(new string('=', Console.WindowWidth));
+            Console.Write(@"{0}{1}{2}",
+                new string(' ', offset),
+                header,
+                new string(' ', Console.WindowWidth - (offset + header.Length)));
+            Console.Write(new string('=', Console.WindowWidth));
+        }
+
+        static public void ReportCondensedEntries()
         {
             Console.Clear();
-            Console.WriteLine(@"{0}{1}", new string(' ', 5), "WIKIMEDIA COUNT TOOL");
-            Console.WriteLine(new string('=', 30));
+            WriteMainHeader();
+            CONSOLE_MESSAGE = "Condensing results";
+            for (int i = 0; i < 5; i++)
+            {
+                Console.Write(CONSOLE_MESSAGE);
+                Thread.Sleep(250);
+                CONSOLE_MESSAGE = ".";
+            }
         }
 
-        static public void WriteDownloadHeader()
+        static public void PrintEntries(List<ViewCountEntry> viewCountEntries, int maxDomainLength, int maxPageTitleLength, int maxViewCountLength)
         {
-            if (printDownloadHeader)
+            Console.Clear();
+            WriteMainHeader();
+
+            string domain = String.Format(@"{0}{1}", "DOMAIN", new string(' ', Math.Max(maxDomainLength - "DOMAIN".Length, 0)));
+            string pageTitle = String.Format(@"{0}{1}", "PAGE TITLE", new string(' ', Math.Max(maxPageTitleLength - "PAGE TITLE".Length, 0)));
+            string viewCount = String.Format(@"{0}{1}", "VIEW COUNT", new string(' ', Math.Max(maxViewCountLength - "VIEW COUNT".Length, 0)));
+            string tableTitle = String.Format(@"{0}|{1}|{2}", domain, pageTitle, viewCount);
+            Console.WriteLine(tableTitle);
+            Console.WriteLine(new string('=', tableTitle.Length));
+
+            foreach (var entry in viewCountEntries)
             {
-                Console.WriteLine(new string('=', 30));
-                Console.WriteLine(@"{0}{1}", new string(' ', 5), "DOWNLOADING FILES");
-                Console.WriteLine(new string('=', 30));
-                printDownloadHeader = false;
+                domain = String.Format(@"{0}{1}", entry.domain, new string(' ', Math.Max(maxDomainLength - entry.domain.Length, 0)));
+                pageTitle = String.Format(@"{0}{1}", entry.pageTitle, new string(' ', Math.Max(maxPageTitleLength - entry.pageTitle.Length, 0)));
+                viewCount = String.Format(@"{0}{1}", entry.viewCount, new string(' ', Math.Max(maxViewCountLength - entry.viewCount.ToString().Length, 0)));
+                Console.WriteLine(@"{0}|{1}|{2}", domain, pageTitle, viewCount);
             }
         }
     }
