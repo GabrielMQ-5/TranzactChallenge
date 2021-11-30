@@ -4,9 +4,9 @@ namespace Core.Entities
 {
     public class ViewCountEntry
     {
-        public String domain;
-        public String pageTitle;
-        public int viewCount;
+        private String domain;
+        private String pageTitle;
+        private int viewCount;
 
         public ViewCountEntry(string domain, string pageTitle, int viewCount)
         {
@@ -15,9 +15,19 @@ namespace Core.Entities
             this.viewCount = viewCount;
         }
 
-        public void AddViewCount(int viewCount)
+        public string GetDomain()
         {
-            this.viewCount += viewCount;
+            return domain;
+        }
+
+        public string GetPageTitle()
+        {
+            return pageTitle;
+        }
+
+        public int GetViewCount()
+        {
+            return viewCount;
         }
     }
 }

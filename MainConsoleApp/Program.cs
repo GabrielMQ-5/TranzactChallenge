@@ -12,7 +12,7 @@ namespace MainConsoleApp
             DateTime start = DateTime.Now;
             Console.CursorVisible = false;
             Console.OutputEncoding = Encoding.Unicode;
-            ConsoleHelper.SetCurrentFont("Consolas", 10);
+            ConsoleHelper.SetCurrentFont("Verdana");
             MainHelper.SetupFolderStructure();
             MainHelper.CleanUpFolders();
             WikimediaService wmService = new();

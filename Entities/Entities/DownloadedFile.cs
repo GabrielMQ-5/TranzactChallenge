@@ -4,24 +4,55 @@ namespace Core.Entities
 {
     public class DownloadedFile
     {
-        public String fileName;
-        public String decompressedFileName;
-        public double percentage;
-        public int totalEntries;
-        public int processedEntries;
+        private String fileName;
+        private String decompressedFileName;
+        private double percentage;
+        private int totalEntries;
+        private int processedEntries;
 
-        public DownloadedFile(string fileName)
+        public DownloadedFile(string fileName, int processedEntries = 0)
         {
             this.fileName = fileName;
-            this.totalEntries = 0;
             this.decompressedFileName = null;
-            this.processedEntries = 0;
             this.percentage = 0;
+            this.totalEntries = 0;
+            this.processedEntries = processedEntries;
+        }
+
+        public string GetFileName()
+        {
+            return fileName;
+        }
+
+        public string GetDecompressedFileName()
+        {
+            return decompressedFileName;
+        }
+
+        public void SetDecompressedFileName(string decompressedFileName)
+        {
+            this.decompressedFileName = decompressedFileName;
+        }
+
+        public double GetPercentage()
+        {
+            return percentage;
         }
 
         public void AddPercentage()
         {
-            percentage = Math.Round(((double)(processedEntries++ * 100) / totalEntries), 2);
+            if (processedEntries == totalEntries) return;
+            percentage = Math.Round(((double)(++processedEntries * 100) / totalEntries), 2);
+        }
+
+        public int GetTotalEntries()
+        {
+            return totalEntries;
+        }
+
+        public void SetTotalEntries(int totalEntries)
+        {
+            this.totalEntries = totalEntries;
         }
     }
 }

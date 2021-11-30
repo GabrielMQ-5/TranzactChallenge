@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Runtime.InteropServices;
 
 
@@ -8,6 +9,7 @@ namespace MainConsoleApp.Helper
     {
         private const int FixedWidthTrueType = 54;
         private const int StandardOutputHandle = -11;
+        public static List<string> exceptionsEncountered = new();
 
         [DllImport("kernel32.dll", SetLastError = true)]
         internal static extern IntPtr GetStdHandle(int nStdHandle);
@@ -38,47 +40,51 @@ namespace MainConsoleApp.Helper
 
         public static FontInfo[] SetCurrentFont(string font, short fontSize = 0)
         {
-            Console.WriteLine("Set Current Font: " + font);
-
             FontInfo before = new FontInfo
             {
                 cbSize = Marshal.SizeOf<FontInfo>()
             };
-
-            if (GetCurrentConsoleFontEx(ConsoleOutputHandle, false, ref before))
+            try
             {
-
-                FontInfo set = new FontInfo
+                if (GetCurrentConsoleFontEx(ConsoleOutputHandle, false, ref before))
                 {
-                    cbSize = Marshal.SizeOf<FontInfo>(),
-                    FontIndex = 0,
-                    FontFamily = FixedWidthTrueType,
-                    FontName = font,
-                    FontWeight = 400,
-                    FontSize = fontSize > 0 ? fontSize : before.FontSize
-                };
 
-                if (!SetCurrentConsoleFontEx(ConsoleOutputHandle, false, ref set))
-                {
-                    var ex = Marshal.GetLastWin32Error();
-                    Console.WriteLine("Set error " + ex);
-                    throw new System.ComponentModel.Win32Exception(ex);
+                    FontInfo set = new FontInfo
+                    {
+                        cbSize = Marshal.SizeOf<FontInfo>(),
+                        FontIndex = 0,
+                        FontFamily = FixedWidthTrueType,
+                        FontName = font,
+                        FontWeight = 400,
+                        FontSize = fontSize > 0 ? fontSize : before.FontSize
+                    };
+
+                    if (!SetCurrentConsoleFontEx(ConsoleOutputHandle, false, ref set))
+                    {
+                        var ex = Marshal.GetLastWin32Error();
+                        throw new System.ComponentModel.Win32Exception(ex);
+                    }
+
+                    FontInfo after = new FontInfo
+                    {
+                        cbSize = Marshal.SizeOf<FontInfo>()
+                    };
+                    GetCurrentConsoleFontEx(ConsoleOutputHandle, false, ref after);
+
+                    return new[] { before, set, after };
                 }
-
-                FontInfo after = new FontInfo
+                else
                 {
-                    cbSize = Marshal.SizeOf<FontInfo>()
-                };
-                GetCurrentConsoleFontEx(ConsoleOutputHandle, false, ref after);
-
-                return new[] { before, set, after };
+                    var er = Marshal.GetLastWin32Error();
+                    throw new System.ComponentModel.Win32Exception(er);
+                }
             }
-            else
+            catch (Exception ex)
             {
-                var er = Marshal.GetLastWin32Error();
-                Console.WriteLine("Get error " + er);
-                throw new System.ComponentModel.Win32Exception(er);
+                exceptionsEncountered.Add("Get error " + ex);
+                return new[] { before, before, before };
             }
         }
     }
 }
+

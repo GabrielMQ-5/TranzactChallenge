@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Threading;
 
 /// <summary>
@@ -10,16 +11,18 @@ namespace Service.Helper
     public class ProgressBar : IDisposable, IProgress<double>
     {
         private const int blockCount = 10;
-        private readonly TimeSpan animationInterval = TimeSpan.FromSeconds(1.0 / 8);
         private const string animation = @"|/-\";
-        private readonly Timer timer;
         
-        public readonly string relatedFile;
-        public string currentText = string.Empty;
+        private readonly TimeSpan animationInterval = TimeSpan.FromSeconds(1.0 / 8);
+        private readonly Timer timer;
+        private readonly string relatedFile;        
 
+        private string currentText = string.Empty;
         private double currentProgress = 0;
         private bool disposed = false;
         private int animationIndex = 0;
+
+        public static List<string> exceptionsEncountered = new();
 
         public ProgressBar(string fileName)
         {
@@ -39,9 +42,9 @@ namespace Service.Helper
                 value = Math.Max(0, Math.Min(1, value));
                 Interlocked.Exchange(ref currentProgress, value);
             }
-            catch (Exception e)
+            catch (Exception ex)
             {
-
+                exceptionsEncountered.Add(ex.Message);
             }
         }
 
@@ -79,5 +82,14 @@ namespace Service.Helper
             }
         }
 
+        public string GetRelatedFile()
+        {
+            return relatedFile;
+        }
+
+        public string GetCurrentText()
+        {
+            return currentText;
+        }
     }
 }

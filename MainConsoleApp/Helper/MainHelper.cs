@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.IO;
 using Core.Constants;
 
@@ -11,11 +12,20 @@ namespace MainConsoleApp.Helper
         private static string dumpsPath = Path.Combine(applicationPath, Constants.DUMPS_FOLDER);
         private static string unzippedPath = Path.Combine(applicationPath, Constants.UNZIPPED_FOLDER);
 
+        public static List<string> exceptionsEncountered = new();
+
         public static void SetupFolderStructure()
         {
-            Directory.CreateDirectory(applicationPath);
-            Directory.CreateDirectory(dumpsPath);
-            Directory.CreateDirectory(unzippedPath);
+            try
+            {
+                Directory.CreateDirectory(applicationPath);
+                Directory.CreateDirectory(dumpsPath);
+                Directory.CreateDirectory(unzippedPath);
+            }
+            catch (Exception ex)
+            {
+                exceptionsEncountered.Add(ex.Message);
+            }
         }
 
         public static void CleanUpFolders()
@@ -42,7 +52,7 @@ namespace MainConsoleApp.Helper
             }
             catch (Exception ex)
             {
-
+                exceptionsEncountered.Add(ex.Message);
             }
 
         }

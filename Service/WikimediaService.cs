@@ -33,6 +33,8 @@ namespace Service
         private enum ProcessStage { Download = 0, Decompress = 1, Extract = 2, Condense = 3, Display = 4 }
         private ProcessStage currentStage;
 
+        public static List<string> exceptionsEncountered = new();
+
         public WikimediaService()
         {
             documentsPath = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
@@ -73,9 +75,9 @@ namespace Service
             });
         }
 
-        public void FindLastFiles()
+        public void FindLastFiles(int maxFiles = Constants.MAX_FILES)
         {
-            while (lastFiles.Count < Constants.MAX_FILES && totalRetries < Constants.MAX_RETRIES)
+            while (lastFiles.Count < maxFiles && totalRetries < Constants.MAX_RETRIES)
             {
                 string fileUrl = ServiceHelper.FormatFileUrl(timestamp);
                 string fileName = ServiceHelper.FormatFileName(timestamp);
@@ -97,7 +99,10 @@ namespace Service
                         fileRetries = 0;
                     }
                 }
-                catch (Exception ex) { }
+                catch (Exception ex)
+                {
+                    exceptionsEncountered.Add(ex.Message);
+                }
             }
         }
 
@@ -111,7 +116,7 @@ namespace Service
             }
             catch (Exception ex)
             {
-
+                exceptionsEncountered.Add(ex.Message);
             }
         }
 
@@ -128,24 +133,24 @@ namespace Service
             }
             catch (Exception ex)
             {
-
+                exceptionsEncountered.Add(ex.Message);
             }
         }
 
         public void ObtainTopResults()
         {
-            viewCountEntries = viewCountEntries.GroupBy(x => new { domain = x != null ? x.domain : null, pageTitle = x != null ? x.pageTitle : null })
-                .Select(sum => new ViewCountEntry(sum.Key.domain, sum.Key.pageTitle, sum.Sum(s => s != null ? s.viewCount : 0)))
-                .OrderByDescending(x => x.viewCount)
+            viewCountEntries = viewCountEntries.GroupBy(x => new { domain = x != null ? x.GetDomain() : null, pageTitle = x != null ? x.GetPageTitle() : null })
+                .Select(sum => new ViewCountEntry(sum.Key.domain, sum.Key.pageTitle, sum.Sum(s => s != null ? s.GetViewCount() : 0)))
+                .OrderByDescending(x => x.GetViewCount())
                 .Take(100).ToList();
             currentStage = ProcessStage.Display;
         }
 
         public void DisplayTopResults()
         {
-            int maxDomainLength = viewCountEntries.Aggregate("", (max, cur) => max.Length > (cur != null ? cur.domain.Length : 0) ? max : cur.domain).Length;
-            int maxPageTitleLength = viewCountEntries.Aggregate("", (max, cur) => max.Length > (cur != null ? cur.pageTitle.Length : 0) ? max : cur.pageTitle).Length;
-            int maxViewCountLength = viewCountEntries.Aggregate("", (max, cur) => max.Length > (cur != null ? cur.viewCount.ToString().Length : 0) ? max : cur.viewCount.ToString()).Length;
+            int maxDomainLength = viewCountEntries.Aggregate("", (max, cur) => max.Length > (cur != null ? cur.GetDomain().Length : 0) ? max : cur.GetDomain()).Length;
+            int maxPageTitleLength = viewCountEntries.Aggregate("", (max, cur) => max.Length > (cur != null ? cur.GetPageTitle().Length : 0) ? max : cur.GetPageTitle()).Length;
+            int maxViewCountLength = viewCountEntries.Aggregate("", (max, cur) => max.Length > (cur != null ? cur.GetViewCount().ToString().Length : 0) ? max : cur.GetViewCount().ToString()).Length;
             ServiceHelper.PrintEntries(viewCountEntries, maxDomainLength, maxPageTitleLength, maxViewCountLength);
         }
 
@@ -180,12 +185,12 @@ namespace Service
                         if (fileRetries == 0)
                         {
                             fileResults.Add(new FileDownloadResult(fileName, Constants.FILE_RESULT_SERVICE_UNAVAILABLE, "503"));
-                            fileResultIndex = fileResults.FindLastIndex(x => x.fileName == fileName);
+                            fileResultIndex = fileResults.FindLastIndex(x => x.GetFileName() == fileName);
                         }
                         if (fileRetries < Constants.MAX_FILE_RETRIES)
                         {
                             fileRetries++;
-                            fileResults[fileResultIndex].retries = fileRetries;
+                            fileResults[fileResultIndex].AddRetries();
                             ServiceHelper.DelayRequest(fileRetries);
                         }
                         else
@@ -199,11 +204,11 @@ namespace Service
                 }
                 else if (args.Cancelled)
                 {
-                    fileResults.Add(new FileDownloadResult(fileName, Constants.FILE_RESULT_CANCELLED, null));
+                    fileResults.Add(new FileDownloadResult(fileName, Constants.FILE_RESULT_CANCELLED));
                 }
                 else
                 {
-                    fileResults.Add(new FileDownloadResult(fileName, Constants.FILE_RESULT_SUCCESS, null));
+                    fileResults.Add(new FileDownloadResult(fileName, Constants.FILE_RESULT_SUCCESS));
                     downloadedFiles.Add(new DownloadedFile(fileName));
                 }
             }
@@ -217,7 +222,7 @@ namespace Service
         {
             var (bytesReceived, totalBytesToReceive) = (Convert.ToDouble(args.BytesReceived), Convert.ToDouble(args.TotalBytesToReceive));
             WebClient client = (WebClient)sender;
-            ProgressBar prBar = progressBars.Find(x => x.relatedFile == client.Headers["fileName"]);
+            ProgressBar prBar = progressBars.Find(x => x.GetRelatedFile() == client.Headers["fileName"]);
             if (prBar == null) return;
             prBar.Report(Math.Round(bytesReceived / totalBytesToReceive, 2));
         }
@@ -237,7 +242,7 @@ namespace Service
 
         public void Decompress(DownloadedFile currentFile)
         {
-            FileInfo fileToDecompress = new FileInfo(dumpsPath + '\\' + currentFile.fileName);
+            FileInfo fileToDecompress = new FileInfo(dumpsPath + '\\' + currentFile.GetFileName());
             using (FileStream originalFileStream = fileToDecompress.OpenRead())
             {
                 string currentFileName = fileToDecompress.Name;
@@ -252,15 +257,15 @@ namespace Service
                     }
                 }
 
-                currentFile.decompressedFileName = newFileName;
-                currentFile.totalEntries = File.ReadLines(newFilePath).Count();
+                currentFile.SetDecompressedFileName(newFileName);
+                currentFile.SetTotalEntries(File.ReadLines(newFilePath).Count());
                 File.Delete(dumpsPath + '\\' + currentFile);
             }
         }
 
         public void ExtractData(DownloadedFile downloadedFile)
         {
-            string fileToProcess = unzippedPath + '\\' + downloadedFile.decompressedFileName;
+            string fileToProcess = unzippedPath + '\\' + downloadedFile.GetDecompressedFileName();
             Task readTask = Task.Run(() =>
             {
                 foreach (string entry in File.ReadLines(fileToProcess))
@@ -274,7 +279,10 @@ namespace Service
                         (string domain, string pageTitle) = (values[0], values[1]);
                         viewCountEntries.Add(new ViewCountEntry(domain, pageTitle, viewCount));
                     }
-                    catch (Exception ex) { }
+                    catch (Exception ex)
+                    {
+                        exceptionsEncountered.Add(ex.Message);
+                    }
                     downloadedFile.AddPercentage();
                 }
                 File.Delete(fileToProcess);

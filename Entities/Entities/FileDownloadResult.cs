@@ -4,17 +4,42 @@ namespace Core.Entities
 {
     public class FileDownloadResult
     {
-        public String fileName;
-        public String result;
-        public String error;
-        public int retries;
+        private String fileName;
+        private String result;
+        private String error;
+        private int retries;
 
-        public FileDownloadResult(string fileName, string result, string error)
+        public FileDownloadResult(string fileName, string result, string error = null)
         {
             this.fileName = fileName;
             this.result = result;
             this.error = error;
             retries = 0;
+        }
+
+        public string GetFileName()
+        {
+            return fileName;
+        }
+
+        public string GetResult()
+        {
+            return result;
+        }
+
+        public string GetError()
+        {
+            return error;
+        }
+
+        public int GetRetries()
+        {
+            return retries;
+        }
+
+        public void AddRetries()
+        {
+            retries++;
         }
     }
 }
