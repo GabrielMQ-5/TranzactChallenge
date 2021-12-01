@@ -1,49 +1,37 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Net;
-using System.Threading;
 using Service;
-using Service.Helper;
-using MainConsoleApp.DisplayElements;
 using MainConsoleApp.Helper;
+using System.Text;
 
 namespace MainConsoleApp
 {
     class Program
     {
-        static List<string> fileNameList;
-        static List<string> fileUrlList;
-        static List<ProgressBar> progressBarList;
-
         static void Main()
         {
+            DateTime start = DateTime.Now;
+            
+            Console.CursorVisible = false;
+            Console.OutputEncoding = Encoding.Unicode;
+            ConsoleHelper.SetCurrentFont("Consolas");
+            
             MainHelper.SetupFolderStructure();
-            ServiceHelper.FindLastFiles();
-            fileNameList = ServiceHelper.GetFilenames();
-            fileUrlList = ServiceHelper.GetUrls();
-            progressBarList = new List<ProgressBar>();
+            MainHelper.CleanUpFolders();
+            
+            WikimediaService wmService = new();
+            wmService.PrintConsole();
+            wmService.FindLastFiles();
+            wmService.WaitDownloads();
+            wmService.ProcessFiles();
+            wmService.WaitReads();
+            wmService.ObtainTopResults();
+            wmService.DisplayTopResults();
 
-            for (int i = 0; i < 3; i++)
-            {
-                progressBarList.Add(new ProgressBar(fileNameList[i], i));
-                WikimediaService wmService = new();
-                wmService.StartDownload(WebClientDownloadProgressChanged, fileUrlList[i], fileNameList[i]);
-            }
-        }
+            DateTime finish = DateTime.Now;
 
-        private static void WebClientDownloadProgressChanged(object sender, DownloadProgressChangedEventArgs e)
-        {
-            WebClient client = sender as WebClient;
-            string filename = client.Headers["filename"];
-            var prBar = progressBarList.Find(x => x.relatedFile == filename);
-            using (prBar)
-            {
-                for (int i = 0; i <= 100; i++)
-                {
-                    prBar.Report(Math.Round(Convert.ToDouble(e.BytesReceived) / Convert.ToDouble(e.TotalBytesToReceive), 2));
-                    Thread.Sleep(20);
-                }
-            }
+            wmService.NavigateResults();
+            
+            Console.WriteLine(@"{0} | {1}", start.ToShortTimeString(), finish.ToShortTimeString());
         }
     }
 }
