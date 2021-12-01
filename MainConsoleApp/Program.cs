@@ -10,11 +10,14 @@ namespace MainConsoleApp
         static void Main()
         {
             DateTime start = DateTime.Now;
+            
             Console.CursorVisible = false;
             Console.OutputEncoding = Encoding.Unicode;
-            ConsoleHelper.SetCurrentFont("Verdana");
+            ConsoleHelper.SetCurrentFont("Consolas");
+            
             MainHelper.SetupFolderStructure();
             MainHelper.CleanUpFolders();
+            
             WikimediaService wmService = new();
             wmService.PrintConsole();
             wmService.FindLastFiles();
@@ -25,6 +28,9 @@ namespace MainConsoleApp
             wmService.DisplayTopResults();
 
             DateTime finish = DateTime.Now;
+
+            wmService.NavigateResults();
+            
             Console.WriteLine(@"{0} | {1}", start.ToShortTimeString(), finish.ToShortTimeString());
         }
     }

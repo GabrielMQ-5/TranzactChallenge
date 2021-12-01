@@ -17,7 +17,7 @@ namespace MainProjectTest
         }
         
         [TestMethod]
-        public void CealUpFolders_Test()
+        public void CleanUpFolders_Test()
         {
             MainHelper.CleanUpFolders();
 

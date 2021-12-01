@@ -15,5 +15,7 @@
         public const string FILE_RESULT_SERVICE_UNAVAILABLE = "SERVICE UNAVAILABLE";
         public const string FILE_RESULT_CANCELLED = "CANCELLED";
         public const string FILE_RESULT_ERRORED = "UNKNOWN ERROR";
+
+        public const int MAX_ENTRIES_PER_PAGE = 25;
     }
 }

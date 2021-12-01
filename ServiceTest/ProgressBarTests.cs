@@ -27,7 +27,7 @@ namespace ServiceTest
 
             ProgressBar progressBar = new ProgressBar(testFileName);
             progressBar.Report(1);
-            Thread.Sleep(150);
+            Thread.Sleep(250);
             progressBar.Dispose();
 
             Assert.AreNotEqual(string.Empty, progressBar.GetCurrentText(), "Current text not properly updated");

@@ -12,16 +12,17 @@ namespace ServiceTest
         [TestMethod]
         public void ServiceHelper_DirectConsolePrintFunctions_Test()
         {
+            // Console calls raise exception whenever they are called within a unit test.
+            // It is an issue with certain Visual Studio versions.
+            ServiceHelper.unitTest = true;
+
             ServiceHelper.DelayRequest(0, 0);
             ServiceHelper.ResetScreen();
             ServiceHelper.ReportCondensedEntries();
 
-            ServiceHelper.WriteMainHeader();
-            ServiceHelper.WriteDecompressHeader();
-
             foreach (ServiceHelper.HeaderType headerType in (ServiceHelper.HeaderType[])Enum.GetValues(typeof(ServiceHelper.HeaderType)))
             {
-                ServiceHelper.WriteReportHeader(headerType);
+                ServiceHelper.WriteHeader(headerType);
             }
 
             try
@@ -38,6 +39,8 @@ namespace ServiceTest
         [TestMethod]
         public void ServiceHelper_GetCurrentTime_Test()
         {
+            ServiceHelper.unitTest = true;
+
             DateTime _tStamp;
             DateTime tStamp;
 
@@ -60,6 +63,8 @@ namespace ServiceTest
         [TestMethod]
         public void ServiceHelper_GetFileName_Test()
         {
+            ServiceHelper.unitTest = true;
+
             DateTime testTime = new DateTime(2021, 1, 1, 0, 0, 0);
             string testFileName = "pageviews-20210101-000000.gz";
             List<DateTime> tTimes = new();
@@ -84,6 +89,8 @@ namespace ServiceTest
         [TestMethod]
         public void ServiceHelper_GetFileUrl_Test()
         {
+            ServiceHelper.unitTest = true;
+
             DateTime testTime = new DateTime(2021, 1, 1, 0, 0, 0);
             string testFileUrl = "2021/2021-01/";
             List<DateTime> tTimes = new();
@@ -108,6 +115,8 @@ namespace ServiceTest
         [TestMethod]
         public void ServiceHelper_PrintViewCountEntries_Test()
         {
+            ServiceHelper.unitTest = true;
+
             DateTime testTime = new DateTime(2021, 1, 1, 0, 0, 0);
             List<DateTime> tTimes = new();
             string tDomain = "Domain";
@@ -133,6 +142,8 @@ namespace ServiceTest
         [TestMethod]
         public void ServiceHelper_ReportDownloadedFiles_Test()
         {
+            ServiceHelper.unitTest = true;
+
             DateTime testTime = new DateTime(2021, 1, 1, 0, 0, 0);
             List<DateTime> tTimes = new();
             string tFileName = "FileName";
@@ -156,6 +167,8 @@ namespace ServiceTest
         [TestMethod]
         public void ServiceHelper_ReportFileDownloadResults_Test()
         {
+            ServiceHelper.unitTest = true;
+
             DateTime testTime = new DateTime(2021, 1, 1, 0, 0, 0);
             List<DateTime> tTimes = new();
             string tFileName = "FileName";
